@@ -13,7 +13,7 @@ A machine learning application built with Streamlit to predict the likelihood of
 1. **Clone the repository** (or download usage files):
    ```bash
    git clone <repository-url>
-   cd "heartdisease project"
+   cd "HeartDiseasePredict"
    ```
 
 2. **Install dependencies**:
