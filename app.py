@@ -6,9 +6,13 @@ import pandas as pd
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
 imputer = joblib.load(os.path.join(BASE_DIR, "imputer.pkl"))
-st.title("🫀 Heart Disease Prediction App")
+
 
 import streamlit.components.v1 as components
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add sparkling effect
 components.html("""
@@ -73,6 +77,46 @@ window.parent.document.body.appendChild(script);
 </script>
 """, height=0, width=0)
 
+st.markdown("""
+    <style>
+    .glitter-container {
+        font-size: 3rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    .glitter-text {
+        background: linear-gradient(to right, #660000, #ff0000, #990000, #660000);
+        background-size: 200% auto;
+        color: #000;
+        background-clip: text;
+        text-fill-color: transparent;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shine 3s linear infinite;
+    }
+    .beating-heart {
+        display: inline-block;
+        animation: heartbeat 2.5s infinite;
+    }
+    @keyframes shine {
+        to {
+            background-position: 200% center;
+        }
+    }
+    @keyframes heartbeat {
+        0% { transform: scale(1); }
+        15% { transform: scale(1.3); }
+        30% { transform: scale(1); }
+        45% { transform: scale(1.15); }
+        60% { transform: scale(1); }
+        100% { transform: scale(1); }
+    }
+    </style>
+    <div class="glitter-container">
+        <span class="beating-heart">🫀</span> <span class="glitter-text">Heart Disease Prediction App</span>
+    </div>
+""", unsafe_allow_html=True)
 st.write("Enter patient details below:")
 age = st.number_input("Age", 1, 120, 50)
 sex = st.selectbox("Sex (0 = Female, 1 = Male)", [0, 1])
@@ -119,3 +163,5 @@ if st.button("Predict"):
     })
     
     st.table(risk_data)
+    
+
