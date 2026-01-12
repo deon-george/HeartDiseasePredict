@@ -3,6 +3,7 @@ import numpy as np
 import joblib
 import os
 import pandas as pd
+import altair as alt
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model = joblib.load(os.path.join(BASE_DIR, "model.pkl"))
 imputer = joblib.load(os.path.join(BASE_DIR, "imputer.pkl"))
@@ -248,7 +249,114 @@ if st.session_state['prediction_done']:
     
     st.table(risk_data)
     
-    # PDF Download
+    # --- Feature Importance Visualization ---
+    st.write("### Feature Analysis")
+    st.write("Visualizing how your health metrics contribute to the prediction. Taller bars represent higher values (relative to the normal range), while darker bars indicate features that have a stronger influence on the model's decision.")
+    
+    # 1. Get Feature Importance (Coefficients)
+    if hasattr(model, 'coef_'):
+        feature_importance = np.abs(model.coef_[0])
+    else:
+        # Fallback for models without coef_ (e.g. Random Forest often uses feature_importances_)
+        feature_importance = model.feature_importances_ if hasattr(model, 'feature_importances_') else np.zeros(13)
+
+    # 2. Prepare Data
+    # Define min-max ranges for normalization based on input widgets
+    feature_ranges = {
+        "Age": (1, 120),
+        "Sex": (0, 1),
+        "Chest Pain Type": (0, 3),
+        "Resting BP": (80, 200),
+        "Cholesterol": (100, 400),
+        "Fasting BS > 120": (0, 1), # Treated as binary 0/1 from inputs
+        "Resting ECG": (0, 2),
+        "Max Heart Rate": (60, 220),
+        "Exercise Angina": (0, 1),
+        "Oldpeak": (0.0, 6.0),
+        "Slope": (0, 2),
+        "Major Vessels": (0, 3),
+        "Thalassemia": (1, 3) 
+    }
+    
+    # Map input keys to the order expected by the model (matches 'new_patient' construction)
+    feature_order = [
+        "Age", "Sex", "Chest Pain Type", "Resting BP", "Cholesterol", "Fasting BS > 120",
+        "Resting ECG", "Max Heart Rate", "Exercise Angina", "Oldpeak",
+        "Slope", "Major Vessels", "Thalassemia"
+    ]
+    
+    # Calculate Normalized Values
+    normalized_values = []
+    original_values = []
+    
+    # Need to reconstruct the raw numeric inputs from the session state or current inputs
+    # Since 'inputs' dict has strings for some (e.g., "Male", "Yes"), we need the raw numeric values used for prediction.
+    # We can perform the reverse mapping or just use the variables directly since they are in scope if we are inside the 'if st.button' block?
+    # Actually, we are in the 'if st.session_state['prediction_done']:' block.
+    # The variables 'age', 'sex', etc. might be from the latest rerun, which matches the session state if valid.
+    # However, to be safe, let's re-extract from session_state['inputs'] and re-convert to numeric.
+    
+    saved_inputs = st.session_state['inputs']
+    
+    # Helper to convert saved string inputs back to numeric if needed, or just use the logic below
+    raw_input_values = [
+        saved_inputs["Age"],
+        1 if saved_inputs["Sex"] == "Male" else 0,
+        saved_inputs["Chest Pain Type"],
+        saved_inputs["Resting BP"],
+        saved_inputs["Cholesterol"],
+        1 if saved_inputs["Fasting BS > 120"] == "True" else 0,
+        saved_inputs["Resting ECG"],
+        saved_inputs["Max Heart Rate"],
+        1 if saved_inputs["Exercise Angina"] == "Yes" else 0,
+        saved_inputs["Oldpeak"],
+        saved_inputs["Slope"],
+        saved_inputs["Major Vessels"],
+        saved_inputs["Thalassemia"]
+    ]
+
+    for i, feature_name in enumerate(feature_order):
+        val = raw_input_values[i]
+        min_v, max_v = feature_ranges[feature_name]
+        
+        # Normalize to 0-1 range for bar height
+        if max_v > min_v:
+            norm_val = (val - min_v) / (max_v - min_v)
+        else:
+            norm_val = 0 # Should not happen with valid ranges
+            
+        normalized_values.append(norm_val)
+        original_values.append(val)
+
+    # Create DataFrame for Altair
+    # We want weight to drive opacity/color. Darker = Higher Weight.
+    chart_data = pd.DataFrame({
+        'Feature': feature_order,
+        'Normalized Value': normalized_values,
+        'Original Value': original_values,
+        'Importance': feature_importance
+    })
+
+    # Sort by Importance for better visual impact? Or keep logical order?
+    # User user might prefer importance. Let's try sorting descending by Normalized Value or Importance.
+    # "Cholesterol bar darker -> model considers it more important"
+    
+    # Altair Chart
+    base = alt.Chart(chart_data).encode(
+        x=alt.X('Feature', sort='-y', axis=alt.Axis(labelAngle=-45)),
+        y=alt.Y('Normalized Value', title='Relative Value (Normalized)'),
+        tooltip=['Feature', 'Original Value', 'Normalized Value', 'Importance']
+    )
+
+    bars = base.mark_bar().encode(
+        # Color intensity based on Importance. 
+        # Using a single hue (e.g., Red or Teal) and varying opacity or saturation.
+        color=alt.Color('Importance', scale=alt.Scale(scheme='reds'), legend=None),
+        opacity=alt.value(0.9)
+    )
+
+    st.altair_chart(bars, use_container_width=True)
+    # ----------------------------------------
     pdf_bytes = create_pdf(
         st.session_state['inputs'], 
         st.session_state['prediction_text_str'], 
